@@ -138,7 +138,7 @@ class MultiCellNetEnv(MultiAgentEnv):
         pc_kw = pc * 1e-3
         n = n_done + n_drop + 1e-6
         r_qos = (-n_drop * q_drop + self.w_xqos * n_done * (1 - q_del)) / n
-        reward = self.w_qos * r_qos - pc_kw * 2
+        reward = self.w_qos * r_qos - pc_kw 
         # dropped = dr @ self.w_drop_cats
         # delay = dl @ self.w_delay_cats
         # reward = -(self.w_drop * dropped + self.w_pc * pc + self.w_delay * delay)
