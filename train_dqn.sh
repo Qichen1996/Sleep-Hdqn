@@ -10,14 +10,14 @@ scenario="B"
 accelerate=1200  # 1 step = 0.02 * 1200 = 24 s
 n_training_threads=24
 n_rollout_threads=2
-num_env_steps=$((25200 * 60))  # steps_per_episode * episodes
+num_env_steps=$((25200 * 80))  # steps_per_episode * episodes
 experiment="check"
 
 algo="hdqn"
 gamma=0.99
-lr=5e-4
+lr=3e-4
 
-w_qos=4
+w_qos=27
 w_xqos=0.005
 
 log_interval=1

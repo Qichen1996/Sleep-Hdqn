@@ -102,14 +102,16 @@ class HDQNTrainer(BaseTrainer):
 
         episodes = 0
         obs, cent_obs, _ = envs.reset()
+        print(obs.shape)
+        print(cent_obs.shape)
         # meta_obs = obs
         antenna = np.array([[[self.goal_space.sample()] for _ in envs.action_space] for _ in range(envs.num_envs)])
         extrinsic_rewards = 0
 
-        pbar = trange(args.num_env_steps)
+        pbar = trange(args.num_env_steps // args.n_rollout_threads)
         for step in pbar:
-            # ALGO LOGIC: put action logic here
-            epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.num_env_steps, step)
+            steps = (step + 1) * args.n_rollout_threads
+            epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.num_env_steps, steps)
 
             if step == 0:
                 if random.random() < epsilon:
@@ -143,7 +145,7 @@ class HDQNTrainer(BaseTrainer):
                 # meta_obs = next_obs
                 cent_obs = next_cent_obs
 
-                if (step + 1) > args.learning_starts:
+                if steps > args.learning_starts:
                     if (step + 1) % args.train_frequency == 0:
                         data = self.meta_rb.sample(args.batch_size)
                         with torch.no_grad():
@@ -167,8 +169,8 @@ class HDQNTrainer(BaseTrainer):
             obs = next_obs
 
             # ALGO LOGIC: training.
-            if step > args.learning_starts:
-                if step % args.train_frequency == 0:
+            if steps > args.learning_starts:
+                if (step + 1) % args.train_frequency == 0:
                     data = self.ctrl_rb.sample(args.batch_size)
                     with torch.no_grad():
                         target_max, _ = self.target_controller.net(data.next_observations).max(dim=1)
@@ -189,7 +191,7 @@ class HDQNTrainer(BaseTrainer):
                     ctrl_optimizer.step()
 
                 # update target network
-                if step % args.target_network_frequency == 0:
+                if steps % args.target_network_frequency == 0:
                     for targ_net_param, net_param in zip(self.target_controller.parameters(), self.controller.parameters()):
                         targ_net_param.data.copy_(
                             args.tau * net_param.data + (1.0 - args.tau) * targ_net_param.data
@@ -206,7 +208,7 @@ class HDQNTrainer(BaseTrainer):
                     rew_df = pd.concat([pd.DataFrame(d['step_rewards']) for d in infos])
                     rew_info = rew_df.describe().loc[['mean', 'std', 'min', 'max']].unstack()
                     rew_info.index = ['_'.join(idx) for idx in rew_info.index]
-                    self.log_train(rew_info, step)
+                    self.log_train(rew_info, steps)
 
 
     def select_goal(self, cent_obs):

@@ -1,0 +1,24 @@
+*.pyc
+*.zip
+*.log
+*.feather
+*.h5
+*.sql
+*.parquet
+*.pkl
+*-checkpoint.py
+.ipynb_checkpoints/
+/.vscode/
+/.idea/
+/.misc/
+/.backup/
+/data/cells-traffic/
+/data/RAN_PM_data/
+/results/**/*/run*/
+!/results/**/*/wandb/*
+/results/
+/analysis/sim_*/
+/wandb/
+# /config.py
+critic*.pt
+/database/

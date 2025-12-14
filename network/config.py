@@ -4,7 +4,7 @@ from utils import dB2lin, lin2dB
 renderMode = 'none'
 
 # base station params
-numBS = 7
+numBS =7
 interBSDist = 400  # the distance between two adjacent BSs
 # cellRadius = 750  # the radius of a hexagon cell in meters
 txPower = 0.2  # average transmit power per antenna in watts
@@ -38,6 +38,26 @@ noiseSpectralDensity = dB2lin(-174 - 30 + 7)
 ueHeight = 1.5  # height of a UE in meters
 
 # default network configuration
+# def calculate_hex_centers(rows, cols, size=1):
+#     """Calculate hexagonal grid centers."""
+#     w = 0
+#     h = 0
+#     centers = []
+#     for r in range(rows):
+#         for c in range(cols):
+#             x = 3/2 * c * size + 300
+#             y = np.sqrt(3) * (r + 0.5 * (c % 2)) * size + 300
+#             w = x if x > w else w
+#             h = y if y > h else h
+#             centers.append((x, y))
+#     return centers, w, h
+
+
+# centers, w, h = calculate_hex_centers(7, 7, size=interBSDist/np.sqrt(3))
+# bsPositions = np.array(centers)
+# areaSize = np.array([w+300, h+300])
+# print(areaSize)
+
 areaSize = np.array([2.5, 2.5]) * interBSDist
 bsPositions = np.vstack([
     [areaSize / 2],

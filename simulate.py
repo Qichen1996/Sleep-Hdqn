@@ -6,6 +6,7 @@ from utils import *
 from agents import *
 from arguments import *
 from env import MultiCellNetEnv
+from gymnasium.spaces import Discrete
 from visualize.render import create_dash_app
 # %reload_ext autoreload
 # %autoreload 2
@@ -16,7 +17,7 @@ render_interval = 4
 model_params = dict(w_qos=4, no_interf=False, max_sleep=3, no_offload=False)
 
 parser = get_config()
-parser.add_argument("-A", '--agent', type=str, default='mappo',
+parser.add_argument('--agent', type=str, default='hdqn',
                     help='type of agent used in simulation')
 parser.add_argument("--perf_save_path", default="results/performance.csv",
                     help="path to save the performance of the simulation")
@@ -31,7 +32,7 @@ parser.add_argument("--stochastic", action="store_true",
 
 env_parser = get_env_config()
     
-parser.set_defaults(log_level='NOTICE', group_name='RANDOM')
+parser.set_defaults(log_level='NOTICE', group_name='B')
 env_parser.set_defaults(accelerate=accelerate)
 
 try:
@@ -77,6 +78,9 @@ def get_model_dir(args, env_args, run_dir, version=''):
             continue
         with open(d/'config.yaml') as f:
             cfg = yaml.safe_load(f)
+            for k in model_params:
+                if k in cfg:
+                    print(cfg[k]['value'])
             if all(getattr(env_args, k) == cfg[k]['value']
                    for k in model_params if k in cfg):
                 return d
@@ -85,7 +89,8 @@ def get_model_dir(args, env_args, run_dir, version=''):
 env = make_env(env_args, seed=args.seed)
 
 obs_space = env.observation_space[0]
-cent_obs_space = env.cent_observation_space
+cent_obs_space = env.cent_observation_space[0]
+goal_space = Discrete(3)
 action_space = env.action_space[0]
 
 run_dir = get_run_dir(args, env_args)
@@ -103,6 +108,10 @@ if args.agent == 'mappo':
     model_dir = args.model_dir or get_model_dir(args, env_args, run_dir, version=args.run_version)
     agent = MappoPolicy(args, obs_space, cent_obs_space, action_space,
                         model_dir=model_dir, model_version=args.model_version)
+elif args.agent == 'hdqn':
+    model_dir = args.model_dir or get_model_dir(args, env_args, run_dir, version=args.run_version)
+    meta_agent = MetaPolicy(cent_obs_space, goal_space, model_dir=model_dir, model_version=args.model_version)
+    sub_agent = SubPolicy(obs_space, action_space, model_dir=model_dir, model_version=args.model_version)
 elif args.agent == 'fixed':
     agent = AlwaysOnPolicy(action_space, env.num_agents)
 elif args.agent == 'random':
@@ -117,7 +126,7 @@ elif args.agent == 'sleepy':
     agent = SleepyPolicy(action_space, env.num_agents)
 else:
     raise ValueError('invalid agent type')
-print('Policy:', type(agent).__name__)
+# print('Policy:', type(agent).__name__)
 
 for par, defval in model_params.items():
     val = getattr(env_args, par)
@@ -151,10 +160,15 @@ def simulate():
     # print('Warming up...')
     # for _ in range(warmup_steps):
     #     env.step()
-    obs, _, _ = env.reset(render_mode)
+    obs, cent_obs, _ = env.reset(render_mode)
     for i in trange(args.num_env_steps, file=sys.stdout):
-        actions = agent.act(obs, deterministic=not args.stochastic)
-        obs, _, rewards, done, _, _ = env.step(
+        if i % 10 == 0:
+            goal = meta_agent.act(cent_obs, deterministic=not args.stochastic)
+        for i in range(len(obs)):
+            obs[i] = np.append(obs[i], goal[i])
+        action = sub_agent.act(obs, deterministic=not args.stochastic)
+        actions = np.column_stack((goal, action))
+        obs, cent_obs, rewards, done, _, _ = env.step(
             actions, render_mode=render_mode, render_interval=render_interval)
         step_rewards.append(np.mean(rewards))
     rewards = pd.Series(np.squeeze(step_rewards), name='reward')

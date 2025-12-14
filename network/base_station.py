@@ -16,6 +16,7 @@ class ConnectMode(enum.IntEnum):
 class BaseStation:
     max_antennas = config.maxAntennas
     min_antennas = config.minAntennas
+    inter_dist = config.interBSDist/1000
     tx_power = config.txPower
     bandwidth = config.bandWidth
     frequency = config.bsFrequency
@@ -56,10 +57,10 @@ class BaseStation:
     other_obs_space = concat_box_envs(public_obs_space, mutual_obs_space)
     total_obs_space = concat_box_envs(
         self_obs_space, duplicate_box_env(
-            other_obs_space, config.numBS - 1))
+            other_obs_space, 6))
     antenna_obs_space = concat_box_envs(
         self_obs_space, duplicate_box_env(
-            other_obs_space, config.numBS - 1),
+            other_obs_space, 6),
             antenna)
     
     public_obs_dim = box_env_ndims(public_obs_space)
@@ -222,9 +223,9 @@ class BaseStation:
     
     @timeit
     def take_action(self, action):
-        if not TRAIN:
-            assert len(action) == len(self.action_dims)
-            info(f'BS {self.id} takes action:\n{action}')
+        # if not TRAIN:
+        #     assert len(action) == len(self.action_dims)
+        #     info(f'BS {self.id} takes action:\n{action}')
         self.switch_antennas(int(action[0]))
         self.switch_sleep_mode(int(action[1]))
         self.switch_connection_mode(int(action[2]) - 1)
@@ -527,12 +528,30 @@ class BaseStation:
 
     @timeit
     @cache_obs
+    # def get_observation(self):
+    #     obs = [self.observe_self()]
+    #     for bs in self.net.bss.values():
+    #         if bs is self: continue
+    #         obs.append(bs.observe_self()[:bs.public_obs_dim])
+    #         obs.append(self.observe_mutual(bs))
+    #     return np.concatenate(obs, dtype=np.float32)
     def get_observation(self):
         obs = [self.observe_self()]
+        num_bs = 0
         for bs in self.net.bss.values():
             if bs is self: continue
-            obs.append(bs.observe_self()[:bs.public_obs_dim])
-            obs.append(self.observe_mutual(bs))
+            if self.neighbor_dist(bs.id) > (self.inter_dist + 0.05): continue
+            pub_obs = bs.observe_self()[:bs.public_obs_dim]
+            mut_obs = self.observe_mutual(bs)
+            obs.append(pub_obs)
+            obs.append(mut_obs)
+            num_bs += 1
+        while num_bs < 6:
+            pub_zero = np.zeros_like(pub_obs)
+            mut_zero = np.zeros_like(mut_obs)
+            obs.append(pub_zero)
+            obs.append(mut_zero)
+            num_bs += 1
         return np.concatenate(obs, dtype=np.float32)
 
     @timeit
